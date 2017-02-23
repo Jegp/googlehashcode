@@ -63,8 +63,27 @@ def requestFactor(number_requests, latency):
 def requestRatio(global_factor, local_factor, video_size):
     return (global_factor - local_factor) / video_size
 
+def sorted_video_mean(video_ratios):
+    video_mean_ratio = {}
+    for v_id, ratios in video_ratios.items():
+        l = [x for x in ratios.values()]
+        if len(l) > 0:
+            video_mean_ratio[v_id] = np.array(l).mean()
+    return sorted(video_mean_ratio, key=video_mean_ratio.get, reverse=True)
+
+def get_latencies(e_id):
+    result = []
+    for l in latency.items():
+        if l[0][0] == e_id:
+            result.append(l)
+    return result
+
+
+
+#Scoring from caches
+cache_scores = {}
 for c_id, (c_capacity, c_videos) in caches.items():
-    video_ratios = defaultdict(list)
+    video_ratios = {}
     for e_id, requests in endpoints.items():
         if (e_id, c_id) in latency:
             for (number_requests, v_id) in requests:
@@ -72,19 +91,38 @@ for c_id, (c_capacity, c_videos) in caches.items():
                 local_factor = requestFactor(number_requests, latency[(e_id, c_id)])
                 global_factor = requestFactor(number_requests, latency[(e_id, "dc")])
                 ratio = requestRatio(global_factor, local_factor, video_size)
-                video_ratios[v_id].append(ratio)
+                if v_id not in video_ratios:
+                    video_ratios[v_id] = {}
+                video_ratios[v_id][e_id] = ratio
 
-    video_mean_ratio = {}
-    for v_id, ratios in video_ratios.items():
-        video_mean_ratio[v_id] = np.array(ratios).mean()
-    # Include score for video size
+    cache_scores[c_id] = video_ratios
 
+
+#Scoring from endpoints
+for e_id, requests in endpoints.items():
+    latencies = get_latencies(e_id)
+    caches_e = [t[1] for t, _ in latencies]
+
+    for number_requests, v_id in requests:
+        rankings = {}
+        for c in caches_e:
+            cs = sorted_video_mean(cache_scores[c])
+            for i, v in enumerate(cs):
+                if v_id == v:
+                    rankings[c] = i
+        rankings_sorted = sorted(rankings, key=rankings.get)
+        for c_id in rankings_sorted[1:]:
+            if e_id in cache_scores[c_id][v_id]:
+                del cache_scores[c_id][v_id][e_id]
+    
+
+for c_id, (c_capacity, c_videos) in caches.items():
     remaining_capacity = c_capacity
-    for v_id in sorted(video_mean_ratio, key=video_mean_ratio.get, reverse=True):
+    for v_id in sorted_video_mean(cache_scores[c_id]):
         if remaining_capacity >= videos[v_id]:
             c_videos.append(v_id)
             remaining_capacity -= videos[v_id]
-    
+
 
 print(len(caches) - 1)
 for c_id, (c_capacity, c_videos) in caches.items():
