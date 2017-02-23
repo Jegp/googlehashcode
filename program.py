@@ -65,8 +65,8 @@ def requestRatio(global_factor, local_factor):
 for c_id, (c_capacity, c_videos) in caches.items():
     video_ratios = defaultdict(list)
     for e_id, requests in endpoints.items():
-        for (number_requests, v_id) in requests:
-            if (e_id, c_id) in latency:
+        if (e_id, c_id) in latency:
+            for (number_requests, v_id) in requests:
                 local_factor = requestFactor(number_requests, latency[(e_id, c_id)])
                 global_factor = requestFactor(number_requests, latency[(e_id, "dc")])
                 ratio = requestRatio(global_factor, local_factor)
