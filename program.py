@@ -1,5 +1,6 @@
 from collections import defaultdict
 import numpy as np
+import sys
 
 data_center_capacity = 9999999999999999999999999
 
@@ -8,7 +9,7 @@ endpoints = {}
 videos = {}
 latency = {}
 
-fname = 'me_at_the_zoo.in'
+fname = sys.argv[1]
 
 with open(fname) as f:
     content = f.readlines()
